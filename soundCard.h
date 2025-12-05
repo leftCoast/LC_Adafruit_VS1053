@@ -47,14 +47,14 @@ class soundCard : public idler, public timeObj {
 	virtual	~soundCard(void);
 
 				bool				begin(void);
-				bool				setSoundfile(char* inFilePath);
+				bool				setSoundfile(const char* inFilePath);
 				bool				command(action inCommand);
 				bool				isPlaying(void);
 				void				setVolume(float inVolume);
 				float				getVolume(void);
 				void				setError(soundCardErr inErr);
 				soundCardErr	getLastError(void);
-				void				playClip(char* filePath);		// NOTE: This BLOCKS! ONLY for "clicks".
+				void				playClip(const char* filePath);		// NOTE: This BLOCKS! ONLY for "clicks".
 
   protected:
   

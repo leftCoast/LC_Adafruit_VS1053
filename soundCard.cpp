@@ -54,7 +54,7 @@ boolean soundCard::begin(void) {
   }
 
 
-boolean soundCard::setSoundfile(char* inFilePath) {
+boolean soundCard::setSoundfile(const char* inFilePath) {
 
 	File testFile;
 	 
@@ -163,7 +163,7 @@ void soundCard::idle(void) {
 // A BLOCKING run-'till-you're-done function. The idea is that there are very short
 // "beep" & "click" sounds that would be nice for UI Development and it would be OK to
 // block for a couple ms.
-void soundCard::playClip(char* filePath) {
+void soundCard::playClip(const char* filePath) {
 
 	File soundFile;
 	
