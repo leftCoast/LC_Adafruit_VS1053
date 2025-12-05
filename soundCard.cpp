@@ -1,6 +1,7 @@
-#include "soundCard.h"
+#include <soundCard.h>
+#include <strTools.h>
+#include <LC_SPI.h>
 
-#include "screen.h" // debugging
 
 soundCard::soundCard(byte boardSetup,byte inCsPin,byte inDrqPin,byte inResetPin) 
   : timeObj(soundCard_SLEEP_MS) { 
@@ -12,6 +13,7 @@ soundCard::soundCard(byte boardSetup,byte inCsPin,byte inDrqPin,byte inResetPin)
     filePath = NULL;
     volume = 40;						// Hardcoded default from Adafruit.
     newSong = false;
+    volMapper.setValues(0,100,MIN_VOL,MAX_VOL);
     setError(noErr);
   }
 
@@ -22,10 +24,7 @@ soundCard::~soundCard(void) {
       delete musicPlayer;
       musicPlayer = NULL;
     }
-    if (filePath) {
-      free(filePath);
-      filePath = NULL;
-    }
+    freeStr(&filePath);
   }
 
 
@@ -57,97 +56,93 @@ boolean soundCard::begin(void) {
 
 boolean soundCard::setSoundfile(char* inFilePath) {
 
-  if (filePath) {
-    free(filePath);
-    filePath = NULL;
-  }
-  if (inFilePath) {
-    filePath = (char*)malloc(strlen(inFilePath)+1);
-    if (filePath) {                               // Good or bad, we've allocated the file path.
-      strcpy(filePath,inFilePath);
-      File testFile = SD.open(filePath);
-      if(testFile) {
-        testFile.close();
-        newSong = true;
-        return true;
-      } else {
-        setError(noFileErr);
-      }
-      free(filePath);                             // If we get here, allocated path was bad.
-      filePath = NULL;                            // So we delete it an flag with NULL.
-    } else {
-      setError(mallocErr);
-    }
-  } else {
-    setError(nullStrErr);
-  }
-  return false; 
+	File testFile;
+	 
+	heapStr(&filePath,inFilePath);		// Copy the incoming file path.
+	if (filePath) {							// If we got the filePath..
+		testFile = SD.open(filePath);		// See if we can open it.
+		if(testFile) {							// If we got it open..
+			testFile.close();					// Close it.
+			newSong = true;					// We got a new song.
+			return true;						// And return our success.
+		} else {									// No test file?
+			freeStr(&filePath);				// Path's no good. Recycle it.
+			setError(noFileErr);				// Toss a file error.
+		}											//
+	} else {										// Didn't get the file path at all!
+		setError(mallocErr);					// Toss an error.
+	}												//
+	return false;								// If we got here, trouble..
 }
 
 
 boolean soundCard::command(action inCommand) {
 
-  boolean success;
+	boolean success;
 
-  setError(noErr);
-  success = false;
-  switch(inCommand) {
-    case play : 																								// User hit play.
-    	if (newSong) {	                                         	// New song loaded?
-    		musicPlayer->stopPlaying();															// Call stop to close data file!
-    		success = musicPlayer->startPlayingFile(filePath);			// Try playing the new song.
-      	if (success) {																					// It worked? Cool!
-      		newSong = false;																			// Note it.
-      	} else {																								// Didn't work?
-      		setError(unknownErr);                 								// Who knows what broke in there?
-      	}
-      } else if (musicPlayer->paused()) {												// No fresh new song. Been paused.
-      	musicPlayer->pausePlaying(false);                 			// Just un-pause.
-      	success = true;                                   			// That's a success.
-      } else if (filePath) {																		// Not paused, but there's a file.
-      	success = musicPlayer->startPlayingFile(filePath);			// Try playing that.
-      	if (!success) setError(unknownErr);                 		// No? Again, who knows what broke in there?
-      } else {                                              		// And if we had no file?
-        setError(noFileErr);                                		// Flag it.
-      }
-      break;
-    case pause :                              // User hits pause.
-      if (musicPlayer->paused()) {            // We're already paused.
-        musicPlayer->pausePlaying(false);     // Then just start up again.
-      } else if (musicPlayer->playingMusic) { // If we're playing?
-        musicPlayer->pausePlaying(true);      // Well, then pause!
-      } 
-      success = true;                         // Good enough really, call it good.
-      break;
-    case fullStop :
-       musicPlayer->stopPlaying();
-       success = true;
-    break;
-    case restart :                                          // User wants a restart.
-      if (filePath) {                                       // If we have a file.
-      	musicPlayer->stopPlaying();													// Call stop to close data file!
-        success = musicPlayer->startPlayingFile(filePath);  // See if we can start playing this file.
-      } else {                                              // And if we had no file?
-        setError(noFileErr);                                // Flag it.
-      }
-      break;
-    default : setError(badCommand);   // We don't know WHAT the user wants!
-  }
-  return success;
+	setError(noErr);
+	success = false;
+	switch(inCommand) {															// Eww, let's see what the user wants.
+		case play :																	// User hit play.
+			if (newSong) {															// New song loaded?
+				musicPlayer->stopPlaying();									// Call stop to close data file!
+				success = musicPlayer->startPlayingFile(filePath);		// Try playing the new song.
+				if (success) {														// It worked? Cool!
+					newSong = false;												// Note it.
+				} else {																// Didn't work?
+					setError(unknownErr);										// Who knows what broke in there?
+				}																		//
+			} else if (musicPlayer->paused()) {								// No fresh new song. Been paused.
+				musicPlayer->pausePlaying(false);							// Just un-pause.
+				success = true;													// That's a success.
+			} else if (filePath) {												// Not paused, but there's a file.
+				success = musicPlayer->startPlayingFile(filePath);		// Try playing that.
+				if (!success) setError(unknownErr);							// No? Again, who knows what broke in there?
+			} else {																	// And if we had no file?
+				setError(noFileErr);												// Flag it.
+			}																			//
+		break;																		// See ya!
+		case pause :																// User hits pause.
+			if (musicPlayer->paused()) {										// We're already paused.
+				musicPlayer->pausePlaying(false);							// Then just start up again.
+			} else if (musicPlayer->playingMusic) {						// If we're playing?
+				musicPlayer->pausePlaying(true);								// Well, then pause!
+			}																			//
+			success = true;														// Good enough really, call it good.
+		break;																		// We're out.
+		case fullStop :															// They want us to stop..
+			musicPlayer->stopPlaying();										// Well do it.
+			success = true;														// Simple enough.
+		break;																		// We're off.
+		case restart :																// User wants a restart.
+			if (filePath) {														// If we have a file.
+				musicPlayer->stopPlaying();									// Call stop to close data file!
+				success = musicPlayer->startPlayingFile(filePath);		// See if we can start playing this file.
+			} else {																	// And if we had no file?
+				setError(noFileErr);												// Flag it.
+			}																			//
+		break;																		// Exit stage right!
+		default : setError(badCommand);										// We don't know WHAT the user wants!
+	}																					//
+	return success;																// Return our success or failure.
 }
 
           
 boolean soundCard::isPlaying(void) { return musicPlayer->playingMusic; }
 
 
-void soundCard::setVolume(byte inVolume) { 
+// Now volume is 0..100% Makes more sense to me.
+void soundCard::setVolume(float inVolume) { 
 
+	byte volByte;
+	
 	volume = inVolume;
-	musicPlayer->setVolume(inVolume,inVolume);
+	volByte = round(volMapper.map(volume));
+	musicPlayer->setVolume(volByte,volByte);
 }
 
 
-byte soundCard::getVolume(void) { return volume; }
+float soundCard::getVolume(void) { return volume; }
 
 
 void soundCard::setError(soundCardErr inErr) { lastErr = inErr; }
@@ -165,11 +160,9 @@ void soundCard::idle(void) {
 }
 
 
-// A BLOCKING run-'till-you're-done function.
-// The idea is that there are very short "beep" 
-// & "click" sounds that would be nice for UI
-// Development and it would be OK to block for
-// a couple ms.
+// A BLOCKING run-'till-you're-done function. The idea is that there are very short
+// "beep" & "click" sounds that would be nice for UI Development and it would be OK to
+// block for a couple ms.
 void soundCard::playClip(char* filePath) {
 
 	File soundFile;
@@ -181,7 +174,7 @@ void soundCard::playClip(char* filePath) {
 				musicPlayer->feedBuffer();
 			}
 		}
-  	}
+	}
 }
 
 
