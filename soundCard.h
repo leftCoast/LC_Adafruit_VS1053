@@ -52,14 +52,14 @@ class soundCard : public idler, public timeObj {
 				bool				isPlaying(void);
 				void				setVolume(float inVolume);
 				float				getVolume(void);
-				void				setError(soundCardErr inErr);
 				soundCardErr	getLastError(void);
 				void				playClip(const char* filePath);		// NOTE: This BLOCKS! ONLY for "clicks".
 
   protected:
   
 	virtual	void				idle(void);
-
+				void				setError(soundCardErr inErr);
+				
 				Adafruit_VS1053_FilePlayer* musicPlayer;
 				mapper			volMapper;
 				soundCardErr	lastErr;
